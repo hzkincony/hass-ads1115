@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure ADS1115 Device",
+        "description": "Set up your ADS1115 ADC sensor. Make sure I2C is enabled on your system.",
+        "data": {
+          "i2c_bus": "I2C Bus Number",
+          "i2c_address": "I2C Address"
+        }
+      },
+      "select_channels": {
+        "title": "Select Channels",
+        "description": "Select which analog input channels to monitor on {device}.",
+        "data": {
+          "channels": "Channels",
+          "gain": "Gain (Voltage Range)"
+        }
+      },
+      "configure_channel": {
+        "title": "Configure Channel {channel}",
+        "description": "Configure settings for channel {channel} ({progress}).",
+        "data": {
+          "measurement_type": "Measurement Type",
+          "differential_pair": "Differential Pair",
+          "name": "Sensor Name"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to ADS1115. Check I2C bus number and address.",
+      "permission_denied": "Permission denied accessing I2C. Run: sudo usermod -a -G i2c $USER",
+      "unknown": "Unknown error occurred. Check logs for details.",
+      "no_channels": "Please select at least one channel."
+    },
+    "abort": {
+      "already_configured": "This ADS1115 device is already configured."
+    }
+  }
+}
