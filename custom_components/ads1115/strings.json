@@ -22,9 +22,14 @@
         "description": "Configure settings for channel {channel} ({progress}).",
         "data": {
           "measurement_type": "Measurement Type",
-          "differential_pair": "Differential Pair",
-          "multiplier": "Calibration Multiplier",
+          "differential_pair": "Differential Pair (only for Differential mode)",
+          "multiplier": "Calibration Multiplier (e.g., 4.03 for voltage divider)",
           "name": "Sensor Name"
+        },
+        "data_description": {
+          "measurement_type": "Single-ended: measure voltage relative to GND. Differential: measure voltage difference between two channels.",
+          "differential_pair": "Select which two channels to use for differential measurement. Ignored if Single-ended is selected.",
+          "multiplier": "Multiply the measured voltage by this factor. Useful for voltage dividers (e.g., battery monitoring)."
         }
       }
     },
