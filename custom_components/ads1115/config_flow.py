@@ -102,14 +102,15 @@ class ADS1115ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not selected_channels:
                 errors["base"] = "no_channels"
             else:
-                self._selected_channels = sorted(selected_channels)
+                # Convert string channel IDs to integers
+                self._selected_channels = sorted([int(ch) for ch in selected_channels])
                 self._current_channel_index = 0
 
                 # Store default gain for all channels
                 for channel in self._selected_channels:
                     channel_id = f"channel_{channel}"
                     self._channels_config[channel_id] = {
-                        "channel": channel,
+                        "channel": channel,  # Now it's an int
                         "gain": gain,
                     }
 
