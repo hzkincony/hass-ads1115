@@ -59,6 +59,7 @@ class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
     _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_has_entity_name = True
+    _attr_suggested_display_precision = 2
 
     def __init__(
         self,
