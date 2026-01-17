@@ -23,6 +23,7 @@
         "data": {
           "measurement_type": "Measurement Type",
           "differential_pair": "Differential Pair",
+          "multiplier": "Calibration Multiplier",
           "name": "Sensor Name"
         }
       }

@@ -130,11 +130,17 @@ class ADS1115Coordinator(DataUpdateCoordinator):
                     # Convert to voltage
                     voltage = raw_value * self._voltage_factors[channel_id]
 
+                    # Apply multiplier (for voltage dividers, etc.)
+                    multiplier = config.get("multiplier", 1.0)
+                    calibrated_voltage = voltage * multiplier
+
                     data[channel_id] = {
-                        "voltage": round(voltage, 4),
+                        "voltage": round(calibrated_voltage, 4),
+                        "raw_voltage": round(voltage, 4),
                         "raw": raw_value,
                         "gain": f"±{gain_str}V",
                         "max_voltage": max_voltage,
+                        "multiplier": multiplier,
                     }
 
                     _LOGGER.debug(

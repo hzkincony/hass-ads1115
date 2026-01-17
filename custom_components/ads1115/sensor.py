@@ -146,6 +146,8 @@ class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
 
         attributes = {
             "raw_value": channel_data.get("raw"),
+            "raw_voltage": channel_data.get("raw_voltage"),
+            "multiplier": channel_data.get("multiplier"),
             "gain": channel_data.get("gain"),
             "max_voltage": channel_data.get("max_voltage"),
         }

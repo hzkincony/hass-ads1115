@@ -9,6 +9,7 @@ CONF_CHANNELS = "channels"
 CONF_GAIN = "gain"
 CONF_MEASUREMENT_TYPE = "measurement_type"
 CONF_DIFFERENTIAL_PAIR = "differential_pair"
+CONF_MULTIPLIER = "multiplier"
 
 # Default values
 DEFAULT_I2C_BUS = 1
@@ -16,6 +17,7 @@ DEFAULT_I2C_ADDRESS = 0x48
 DEFAULT_GAIN = "4.096"
 DEFAULT_SCAN_INTERVAL = 30  # seconds
 DEFAULT_NAME = "ADS1115"
+DEFAULT_MULTIPLIER = 1.0
 
 # I2C addresses (based on ADDR pin connection)
 I2C_ADDRESSES = {
