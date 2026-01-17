@@ -116,12 +116,13 @@ class ADS1115ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._selected_channels = sorted([int(ch) for ch in selected_channels])
                 self._current_channel_index = 0
 
-                # Store default gain for all channels
+                # Store default gain and multiplier for all channels
                 for channel in self._selected_channels:
                     channel_id = f"channel_{channel}"
                     self._channels_config[channel_id] = {
                         "channel": channel,  # Now it's an int
                         "gain": gain,
+                        "multiplier": DEFAULT_MULTIPLIER,
                     }
 
                 # Move to per-channel configuration
