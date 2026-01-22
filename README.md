@@ -53,7 +53,7 @@ This allows up to 4 ADS1115 devices on the same I2C bus.
 2. Go to "Integrations"
 3. Click the three dots in the top right corner
 4. Select "Custom repositories"
-5. Add this repository URL: `https://github.com/idreamshen/hacs-ads1115`
+5. Add this repository URL: `https://github.com/hzkincony/hacs-ads1115`
 6. Select category: "Integration"
 7. Click "Add"
 8. Search for "ADS1115 ADC Sensor"
@@ -301,18 +301,12 @@ Contributions are welcome! Please:
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/idreamshen/hacs-ads1115/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/idreamshen/hacs-ads1115/discussions)
+- **Issues**: [GitHub Issues](https://github.com/hzkincony/hacs-ads1115/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/hzkincony/hacs-ads1115/discussions)
 
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Credits
-
-- Developed by [@idreamshen](https://github.com/idreamshen)
-- Uses the [ADS1x15-ADC](https://github.com/chandrawi/ADS1x15-ADC) library by chandrawi
-- Inspired by the Home Assistant community
 
 ## Disclaimer
 

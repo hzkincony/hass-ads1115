@@ -7,7 +7,7 @@
   "documentation": "https://github.com/hzkincony/hass-ads1115",
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/idreamshen/hacs-ads1115/issues",
+  "issue_tracker": "https://github.com/hzkincony/hacs-ads1115/issues",
   "requirements": ["ADS1x15-ADC==1.2.2", "smbus2"],
   "version": "1.0.0"
 }
