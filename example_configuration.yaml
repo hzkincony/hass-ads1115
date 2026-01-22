@@ -1,0 +1,182 @@
+# ADS1115 ADC Sensor Configuration (ESPHome-style)
+# Documentation: https://esphome.io/components/sensor/ads1115/
+
+# ============================================================================
+# Step 1: Define ADS1115 Hub(s)
+# ============================================================================
+# The hub defines the physical ADS1115 device on the I2C bus
+
+ads1115:
+  # Single hub (most common setup)
+  - address: 0x48          # I2C address (default: 0x48 = 72 decimal)
+    i2c_bus: 1             # I2C bus number (default: 1)
+
+  # Multiple hubs on same I2C bus (optional)
+  # - address: 0x49        # Second device with ADDR pin to VDD
+  #   i2c_bus: 1
+  #   id: ads1115_second   # Optional: custom ID for reference
+
+
+# ============================================================================
+# Step 2: Define Sensors
+# ============================================================================
+# Each sensor references a hub and specifies the multiplexer (channel/pins)
+
+sensor:
+  # -------------------------
+  # Single-ended measurements
+  # -------------------------
+  # Measures voltage between AIN pin and GND
+
+  - platform: ads1115
+    multiplexer: A0_GND      # Channel 0 to GND
+    gain: "4.096"            # Voltage range: ±4.096V (for 3.3V sensors)
+    name: "Soil Moisture"
+
+  - platform: ads1115
+    multiplexer: A1_GND      # Channel 1 to GND
+    gain: "6.144"            # Voltage range: ±6.144V (for 5V sensors)
+    name: "Light Sensor"
+
+  - platform: ads1115
+    multiplexer: A2_GND      # Channel 2 to GND
+    gain: "4.096"
+    name: "Temperature Sensor"
+
+
+  # -------------------------
+  # Differential measurements
+  # -------------------------
+  # Measures voltage difference between two AIN pins
+
+  - platform: ads1115
+    multiplexer: A0_A1       # Differential: AIN0 - AIN1
+    gain: "0.256"            # High precision for small voltages
+    name: "Thermocouple"
+
+
+  # -------------------------
+  # Using multiplier for calibration
+  # -------------------------
+
+  # Example 1: Battery monitoring with voltage divider
+  # Circuit: Battery -> R1 (10kΩ) -> AIN0 -> R2 (3.3kΩ) -> GND
+  # Multiplier = (R1 + R2) / R2 = (10 + 3.3) / 3.3 = 4.03
+  - platform: ads1115
+    multiplexer: A3_GND
+    gain: "4.096"
+    name: "Battery Voltage"
+    multiplier: 4.03         # Compensate for voltage divider
+
+  # Example 2: Current sensing with shunt resistor
+  # Circuit: Load -> 0.1Ω shunt -> GND, measure voltage across shunt
+  # Multiplier converts voltage to current: I = V / R = V / 0.1 = 10 * V
+  - platform: ads1115
+    multiplexer: A0_A1
+    gain: "0.256"
+    name: "Load Current"
+    multiplier: 10.0         # V / 0.1Ω shunt = A
+
+
+# ============================================================================
+# Multiple Hubs Example
+# ============================================================================
+
+# # Define multiple ADS1115 devices
+# ads1115:
+#   - address: 0x48
+#     i2c_bus: 1
+#     id: ads1115_primary    # Custom ID
+#
+#   - address: 0x49
+#     i2c_bus: 1
+#     id: ads1115_secondary  # Custom ID
+#
+# sensor:
+#   # Sensors on first device (0x48)
+#   - platform: ads1115
+#     id: ads1115_primary      # Reference the hub
+#     multiplexer: A0_GND
+#     name: "Primary Sensor 1"
+#
+#   # Sensors on second device (0x49)
+#   - platform: ads1115
+#     id: ads1115_secondary    # Reference the hub
+#     multiplexer: A0_GND
+#     name: "Secondary Sensor 1"
+
+
+# ============================================================================
+# Configuration Reference
+# ============================================================================
+
+# ADS1115 Hub Configuration
+# -------------------------
+# address (optional, default: 0x48)
+#   I2C address in hex or decimal:
+#   - 0x48 (72): ADDR pin to GND (default)
+#   - 0x49 (73): ADDR pin to VDD
+#   - 0x4A (74): ADDR pin to SDA
+#   - 0x4B (75): ADDR pin to SCL
+#
+# i2c_bus (optional, default: 1)
+#   I2C bus number (typically 1 on Raspberry Pi)
+#
+# id (optional)
+#   Custom identifier for referencing this hub from sensors
+
+
+# Sensor Configuration
+# --------------------
+# platform (required)
+#   Must be: ads1115
+#
+# multiplexer (required)
+#   Selects which pins to measure:
+#   Single-ended (pin to GND):
+#     A0_GND, A1_GND, A2_GND, A3_GND
+#   Differential (pin to pin):
+#     A0_A1, A0_A3, A1_A3, A2_A3
+#
+# gain (optional, default: "4.096")
+#   Voltage range setting (must be quoted string):
+#   - "6.144": ±6.144V (use for 5V sensors)
+#   - "4.096": ±4.096V (use for 3.3V sensors, default)
+#   - "2.048": ±2.048V (higher precision)
+#   - "1.024": ±1.024V (higher precision)
+#   - "0.512": ±0.512V (very high precision)
+#   - "0.256": ±0.256V (ultra high precision)
+#   NOTE: Always use quotes around gain values!
+#
+# name (required)
+#   Friendly name for the sensor entity
+#
+# multiplier (optional, default: 1.0)
+#   Calibration factor (range: 0.001 to 1000.0)
+#   Use for voltage dividers, current sensing, etc.
+#
+# address (optional)
+#   I2C address if not using hub definition
+#   Only needed if you don't define ads1115: hub
+#
+# i2c_bus (optional, default: 1)
+#   I2C bus number if not using hub definition
+#
+# id (optional)
+#   Reference to a specific hub (when using multiple hubs)
+
+
+# ============================================================================
+# ESPHome Compatibility Notes
+# ============================================================================
+#
+# This plugin uses ESPHome-style configuration:
+#   ✓ ads1115: hub component
+#   ✓ multiplexer: A0_GND, A0_A1, etc. (instead of channel numbers)
+#   ✓ gain: voltage ranges in volts (as quoted strings)
+#   ✓ multiplier: for calibration
+#
+# Not implemented (ESPHome-specific):
+#   ✗ continuous_mode: (always uses single-shot mode)
+#   ✗ sample_rate: (uses library defaults)
+#   ✗ update_interval: (uses Home Assistant scan_interval)

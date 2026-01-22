@@ -4,12 +4,12 @@ DOMAIN = "ads1115"
 
 # Configuration keys
 CONF_I2C_BUS = "i2c_bus"
-CONF_I2C_ADDRESS = "i2c_address"
 CONF_CHANNELS = "channels"
 CONF_GAIN = "gain"
 CONF_MEASUREMENT_TYPE = "measurement_type"
 CONF_DIFFERENTIAL_PAIR = "differential_pair"
 CONF_MULTIPLIER = "multiplier"
+CONF_MULTIPLEXER = "multiplexer"
 
 # Default values
 DEFAULT_I2C_BUS = 1
@@ -18,14 +18,6 @@ DEFAULT_GAIN = "4.096"
 DEFAULT_SCAN_INTERVAL = 30  # seconds
 DEFAULT_NAME = "ADS1115"
 DEFAULT_MULTIPLIER = 1.0
-
-# I2C addresses (based on ADDR pin connection)
-I2C_ADDRESSES = {
-    "0x48": {"value": 0x48, "label": "0x48 (ADDR -> GND)"},
-    "0x49": {"value": 0x49, "label": "0x49 (ADDR -> VDD)"},
-    "0x4A": {"value": 0x4A, "label": "0x4A (ADDR -> SDA)"},
-    "0x4B": {"value": 0x4B, "label": "0x4B (ADDR -> SCL)"},
-}
 
 # Programmable Gain Amplifier settings
 # Format: "voltage_range": (ADS1x15 constant value, max voltage)
@@ -57,7 +49,17 @@ CHANNELS = [0, 1, 2, 3]
 MANUFACTURER = "Texas Instruments"
 MODEL = "ADS1115"
 
-# Error messages
-ERROR_CANNOT_CONNECT = "cannot_connect"
-ERROR_UNKNOWN = "unknown"
-ERROR_PERMISSION_DENIED = "permission_denied"
+# Multiplexer configuration (ESPHome-style)
+# Maps multiplexer names to channel configuration
+MULTIPLEXER_MAP = {
+    # Single-ended measurements
+    "A0_GND": {"type": MEASUREMENT_SINGLE, "channel": 0},
+    "A1_GND": {"type": MEASUREMENT_SINGLE, "channel": 1},
+    "A2_GND": {"type": MEASUREMENT_SINGLE, "channel": 2},
+    "A3_GND": {"type": MEASUREMENT_SINGLE, "channel": 3},
+    # Differential measurements
+    "A0_A1": {"type": MEASUREMENT_DIFFERENTIAL, "pair": "0-1"},
+    "A0_A3": {"type": MEASUREMENT_DIFFERENTIAL, "pair": "0-3"},
+    "A1_A3": {"type": MEASUREMENT_DIFFERENTIAL, "pair": "1-3"},
+    "A2_A3": {"type": MEASUREMENT_DIFFERENTIAL, "pair": "2-3"},
+}

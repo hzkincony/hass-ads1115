@@ -4,52 +4,148 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import voluptuous as vol
+
 from homeassistant.components.sensor import (
+    PLATFORM_SCHEMA,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfElectricPotential
+from homeassistant.const import CONF_ADDRESS, CONF_ID, CONF_NAME, UnitOfElectricPotential
 from homeassistant.core import HomeAssistant
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    CONF_I2C_ADDRESS,
+    CONF_GAIN,
+    CONF_I2C_BUS,
+    CONF_MULTIPLEXER,
+    CONF_MULTIPLIER,
+    DEFAULT_GAIN,
+    DEFAULT_I2C_ADDRESS,
+    DEFAULT_I2C_BUS,
+    DEFAULT_MULTIPLIER,
     DOMAIN,
+    GAIN_OPTIONS,
     MANUFACTURER,
     MEASUREMENT_DIFFERENTIAL,
+    MEASUREMENT_SINGLE,
     MODEL,
+    MULTIPLEXER_MAP,
 )
 from .coordinator import ADS1115Coordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+def validate_gain(value):
+    """Validate and convert gain to string."""
+    # Convert to string if it's a number
+    gain_str = str(value)
+    if gain_str not in GAIN_OPTIONS:
+        raise vol.Invalid(f"Invalid gain value: {value}. Must be one of {list(GAIN_OPTIONS.keys())}")
+    return gain_str
 
-async def async_setup_entry(
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+    {
+        vol.Optional(CONF_I2C_BUS, default=DEFAULT_I2C_BUS): cv.positive_int,
+        vol.Optional(CONF_ADDRESS, default=DEFAULT_I2C_ADDRESS): cv.positive_int,
+        vol.Optional(CONF_ID): cv.string,
+        vol.Required(CONF_MULTIPLEXER): vol.In(list(MULTIPLEXER_MAP.keys())),
+        vol.Required(CONF_NAME): cv.string,
+        vol.Optional(CONF_GAIN, default=DEFAULT_GAIN): validate_gain,
+        vol.Optional(CONF_MULTIPLIER, default=DEFAULT_MULTIPLIER): vol.All(
+            vol.Coerce(float), vol.Range(min=0.001, max=1000.0)
+        ),
+    }
+)
+
+
+async def async_setup_platform(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config: ConfigType,
     async_add_entities: AddEntitiesCallback,
+    discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
-    """Set up ADS1115 sensor entities."""
-    coordinator: ADS1115Coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    """Set up ADS1115 sensor platform."""
+    i2c_bus = config[CONF_I2C_BUS]
+    i2c_address = config[CONF_ADDRESS]
+    hub_id = config.get(CONF_ID)
+    multiplexer = config[CONF_MULTIPLEXER]
 
-    # Create sensor entities for each configured channel
-    entities = []
-    for channel_id, channel_config in coordinator.channels_config.items():
-        entities.append(
-            ADS1115Sensor(
-                coordinator=coordinator,
-                config_entry=config_entry,
-                channel_id=channel_id,
-                channel_config=channel_config,
-            )
+    # Parse multiplexer to determine measurement type
+    mux_config = MULTIPLEXER_MAP[multiplexer]
+    measurement_type = mux_config["type"]
+
+    # Generate a unique channel ID based on multiplexer setting
+    channel_id = f"mux_{multiplexer.replace('-', '_').replace('_GND', '')}"
+
+    # Build channel config
+    channel_config = {
+        CONF_NAME: config[CONF_NAME],
+        CONF_MULTIPLEXER: multiplexer,
+        "measurement_type": measurement_type,
+        CONF_GAIN: config[CONF_GAIN],
+        CONF_MULTIPLIER: config[CONF_MULTIPLIER],
+    }
+
+    # Add channel or differential pair info
+    if measurement_type == MEASUREMENT_SINGLE:
+        channel_config["channel"] = mux_config["channel"]
+    else:
+        channel_config["differential_pair"] = mux_config["pair"]
+
+    _LOGGER.debug(
+        "Setting up ADS1115 sensor: bus=%d, address=0x%02x, multiplexer=%s",
+        i2c_bus,
+        i2c_address,
+        multiplexer,
+    )
+
+    # Get or create coordinator for this hub
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+
+    # Try to find coordinator by hub_id first, then by address key
+    coordinator_key = f"{i2c_bus}_{i2c_address}"
+    coordinator = None
+
+    if hub_id and hub_id in hass.data[DOMAIN]:
+        coordinator = hass.data[DOMAIN][hub_id]
+    elif coordinator_key in hass.data[DOMAIN]:
+        coordinator = hass.data[DOMAIN][coordinator_key]
+    else:
+        # Create new coordinator if hub wasn't explicitly defined
+        _LOGGER.info(
+            "Creating implicit ADS1115 hub at 0x%02x on bus %d (no hub configuration found)",
+            i2c_address,
+            i2c_bus,
         )
+        coordinator = ADS1115Coordinator(hass, i2c_bus, i2c_address, {})
+        hass.data[DOMAIN][coordinator_key] = coordinator
 
-    async_add_entities(entities)
-    _LOGGER.debug("Added %d ADS1115 sensor entities", len(entities))
+    # Add this channel to the coordinator
+    coordinator.channels_config[channel_id] = channel_config
+
+    # Initialize coordinator if this is the first channel
+    if coordinator.adc is None:
+        await coordinator.async_setup()
+        await coordinator.async_config_entry_first_refresh()
+
+    # Create sensor entity
+    async_add_entities([
+        ADS1115Sensor(
+            coordinator=coordinator,
+            channel_id=channel_id,
+            channel_config=channel_config,
+            i2c_address=i2c_address,
+        )
+    ])
+
+    _LOGGER.debug("Added ADS1115 sensor: %s (%s)", config[CONF_NAME], multiplexer)
 
 
 class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
@@ -59,38 +155,28 @@ class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
     _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_has_entity_name = True
-    _attr_suggested_display_precision = 2
+    _attr_suggested_display_precision = 3
 
     def __init__(
         self,
         coordinator: ADS1115Coordinator,
-        config_entry: ConfigEntry,
         channel_id: str,
         channel_config: dict[str, Any],
+        i2c_address: int,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
 
         self._channel_id = channel_id
         self._channel_config = channel_config
-        self._config_entry = config_entry
+        self._i2c_address = i2c_address
 
         # Generate unique ID
-        i2c_address = config_entry.data[CONF_I2C_ADDRESS]
-        self._attr_unique_id = f"{DOMAIN}_{i2c_address:02x}_{channel_id}"
+        multiplexer = channel_config[CONF_MULTIPLEXER]
+        self._attr_unique_id = f"{DOMAIN}_{i2c_address:02x}_{multiplexer.replace('-', '_')}"
 
-        # Set entity name
-        custom_name = channel_config.get("name")
-        if custom_name:
-            self._attr_name = custom_name
-        else:
-            # Auto-generate name based on measurement type
-            if channel_config.get("measurement_type") == MEASUREMENT_DIFFERENTIAL:
-                diff_pair = channel_config.get("differential_pair", "0-1")
-                self._attr_name = f"Differential {diff_pair}"
-            else:
-                channel_num = channel_config.get("channel", 0)
-                self._attr_name = f"Channel {channel_num}"
+        # Set entity name from config
+        self._attr_name = channel_config.get(CONF_NAME, f"ADS1115 {multiplexer}")
 
         _LOGGER.debug(
             "Created sensor: id=%s, name=%s, unique_id=%s",
@@ -102,10 +188,9 @@ class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
-        i2c_address = self._config_entry.data[CONF_I2C_ADDRESS]
         return DeviceInfo(
-            identifiers={(DOMAIN, self._config_entry.entry_id)},
-            name=f"ADS1115 (0x{i2c_address:02x})",
+            identifiers={(DOMAIN, f"ads1115_{self._i2c_address:02x}")},
+            name=f"ADS1115 (0x{self._i2c_address:02x})",
             manufacturer=MANUFACTURER,
             model=MODEL,
             sw_version="1.0.0",
@@ -151,13 +236,12 @@ class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
             "multiplier": channel_data.get("multiplier"),
             "gain": channel_data.get("gain"),
             "max_voltage": channel_data.get("max_voltage"),
+            "multiplexer": self._channel_config[CONF_MULTIPLEXER],
         }
 
-        # Add channel-specific attributes
+        # Add measurement-specific attributes
         if self._channel_config.get("measurement_type") == MEASUREMENT_DIFFERENTIAL:
-            attributes["differential_pair"] = self._channel_config.get(
-                "differential_pair"
-            )
+            attributes["differential_pair"] = self._channel_config.get("differential_pair")
             attributes["measurement_type"] = "differential"
         else:
             attributes["channel"] = self._channel_config.get("channel")
