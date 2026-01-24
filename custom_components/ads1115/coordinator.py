@@ -34,7 +34,6 @@ class ADS1115Coordinator(DataUpdateCoordinator):
         self.i2c_address = i2c_address
         self.channels_config = channels_config
         self.adc = None
-        self._voltage_factors = {}
 
         super().__init__(
             hass,
@@ -54,30 +53,10 @@ class ADS1115Coordinator(DataUpdateCoordinator):
                 raise UpdateFailed(f"Failed to import ADS1x15 library: {err}") from err
 
             adc = ADS1115(self.i2c_bus, self.i2c_address)
-
-            # Configure gain for each channel and store voltage factors
-            voltage_factors = {}
-            for channel_id, config in self.channels_config.items():
-                gain_str = config.get("gain", "4.096")
-                gain_value, max_voltage = GAIN_OPTIONS[gain_str]
-
-                # Set gain and get voltage conversion factor
-                adc.setGain(gain_value)
-                voltage_factors[channel_id] = adc.toVoltage()
-
-                _LOGGER.debug(
-                    "Channel %s configured: gain=±%sV, factor=%f",
-                    channel_id,
-                    gain_str,
-                    voltage_factors[channel_id],
-                )
-
-            return adc, voltage_factors
+            return adc
 
         try:
-            self.adc, self._voltage_factors = await self.hass.async_add_executor_job(
-                setup_adc
-            )
+            self.adc = await self.hass.async_add_executor_job(setup_adc)
             _LOGGER.info(
                 "Successfully initialized ADS1115 at I2C address 0x%02x on bus %d",
                 self.i2c_address,
@@ -109,6 +88,11 @@ class ADS1115Coordinator(DataUpdateCoordinator):
         def read_channels():
             """Read all configured channels."""
             data = {}
+            
+            _LOGGER.debug(
+                "Starting ADC read cycle - channels_config keys: %s",
+                list(self.channels_config.keys()),
+            )
 
             for channel_id, config in self.channels_config.items():
                 try:
@@ -118,6 +102,9 @@ class ADS1115Coordinator(DataUpdateCoordinator):
 
                     # Set gain for this channel
                     self.adc.setGain(gain_value)
+                    
+                    # Get voltage conversion factor for current gain setting
+                    voltage_factor = self.adc.toVoltage()
 
                     # Read based on measurement type
                     if measurement_type == MEASUREMENT_DIFFERENTIAL:
@@ -127,8 +114,8 @@ class ADS1115Coordinator(DataUpdateCoordinator):
                         channel_num = config.get("channel")
                         raw_value = self.adc.readADC(channel_num)
 
-                    # Convert to voltage
-                    voltage = raw_value * self._voltage_factors[channel_id]
+                    # Convert to voltage using current voltage factor
+                    voltage = raw_value * voltage_factor
 
                     # Apply multiplier (for voltage dividers, etc.)
                     multiplier = config.get("multiplier", 1.0)
@@ -144,10 +131,13 @@ class ADS1115Coordinator(DataUpdateCoordinator):
                     }
 
                     _LOGGER.debug(
-                        "Channel %s: raw=%d, voltage=%.4fV",
+                        "Read complete: channel_id=%s, ADC_channel=%s, name=%s, raw=%d, voltage=%.4fV, factor=%.6f",
                         channel_id,
+                        channel_num,
+                        config.get("name", "unknown"),
                         raw_value,
                         voltage,
+                        voltage_factor,
                     )
 
                 except Exception as err:

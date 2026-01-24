@@ -7,12 +7,19 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.components.sensor import (
+    CONF_STATE_CLASS,
     PLATFORM_SCHEMA,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import CONF_ADDRESS, CONF_NAME, UnitOfElectricPotential
+from homeassistant.const import (
+    CONF_ADDRESS,
+    CONF_DEVICE_CLASS,
+    CONF_NAME,
+    CONF_UNIT_OF_MEASUREMENT,
+    UnitOfElectricPotential,
+)
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -77,6 +84,10 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Optional(CONF_MULTIPLIER, default=DEFAULT_MULTIPLIER): vol.All(
             vol.Coerce(float), vol.Range(min=0.001, max=1000.0)
         ),
+        # Allow standard sensor fields (with defaults set in entity class)
+        vol.Optional(CONF_DEVICE_CLASS): cv.string,
+        vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
+        vol.Optional(CONF_STATE_CLASS): cv.string,
     }
 )
 
@@ -155,6 +166,14 @@ async def async_setup_platform(
         CONF_GAIN: config[CONF_GAIN],
         CONF_MULTIPLIER: config[CONF_MULTIPLIER],
     }
+    
+    # Add optional sensor configuration (allow user override)
+    if CONF_DEVICE_CLASS in config:
+        channel_config[CONF_DEVICE_CLASS] = config[CONF_DEVICE_CLASS]
+    if CONF_UNIT_OF_MEASUREMENT in config:
+        channel_config[CONF_UNIT_OF_MEASUREMENT] = config[CONF_UNIT_OF_MEASUREMENT]
+    if CONF_STATE_CLASS in config:
+        channel_config[CONF_STATE_CLASS] = config[CONF_STATE_CLASS]
 
     # Add channel or differential pair info
     if measurement_type == MEASUREMENT_SINGLE:
@@ -172,10 +191,19 @@ async def async_setup_platform(
     # Add this channel to the coordinator
     coordinator.channels_config[channel_id] = channel_config
 
+    _LOGGER.debug(
+        "Channel added to coordinator: channel_id=%s, channel_num=%s, name=%s, multiplexer=%s",
+        channel_id,
+        channel_config.get("channel"),
+        channel_config.get(CONF_NAME),
+        multiplexer,
+    )
+
     # Initialize coordinator if this is the first channel
     if coordinator.adc is None:
         await coordinator.async_setup()
-        await coordinator.async_config_entry_first_refresh()
+        await coordinator.async_refresh()
+        _LOGGER.debug("Coordinator initialized and refreshed for first channel")
 
     # Create sensor entity
     async_add_entities([
@@ -193,9 +221,6 @@ async def async_setup_platform(
 class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
     """Representation of an ADS1115 ADC sensor."""
 
-    _attr_device_class = SensorDeviceClass.VOLTAGE
-    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
-    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_has_entity_name = True
     _attr_suggested_display_precision = 3
 
@@ -219,12 +244,25 @@ class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
 
         # Set entity name from config
         self._attr_name = channel_config.get(CONF_NAME, f"ADS1115 {multiplexer}")
+        
+        # Set sensor attributes with defaults, allow user override
+        self._attr_device_class = channel_config.get(
+            CONF_DEVICE_CLASS, SensorDeviceClass.VOLTAGE
+        )
+        self._attr_native_unit_of_measurement = channel_config.get(
+            CONF_UNIT_OF_MEASUREMENT, UnitOfElectricPotential.VOLT
+        )
+        self._attr_state_class = channel_config.get(
+            CONF_STATE_CLASS, SensorStateClass.MEASUREMENT
+        )
 
         _LOGGER.debug(
-            "Created sensor: id=%s, name=%s, unique_id=%s",
-            channel_id,
+            "Created sensor entity: name=%s, channel_id=%s, unique_id=%s, multiplexer=%s, channel_num=%s",
             self._attr_name,
+            channel_id,
             self._attr_unique_id,
+            multiplexer,
+            channel_config.get("channel"),
         )
 
     @property
@@ -245,6 +283,15 @@ class ADS1115Sensor(CoordinatorEntity[ADS1115Coordinator], SensorEntity):
             return None
 
         channel_data = self.coordinator.data.get(self._channel_id)
+        
+        _LOGGER.debug(
+            "Sensor %s requesting data: channel_id=%s, coordinator.data keys=%s, channel_data=%s",
+            self._attr_name,
+            self._channel_id,
+            list(self.coordinator.data.keys()) if self.coordinator.data else None,
+            channel_data,
+        )
+        
         if channel_data is None:
             return None
 
