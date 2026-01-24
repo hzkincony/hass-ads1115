@@ -6,12 +6,13 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.const import CONF_ADDRESS, CONF_ID
+from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
+    CONF_HUB_ID,
     CONF_I2C_BUS,
     DEFAULT_I2C_ADDRESS,
     DEFAULT_I2C_BUS,
@@ -26,7 +27,7 @@ ADS1115_HUB_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_ADDRESS, default=DEFAULT_I2C_ADDRESS): cv.positive_int,
         vol.Optional(CONF_I2C_BUS, default=DEFAULT_I2C_BUS): cv.positive_int,
-        vol.Optional(CONF_ID): cv.string,
+        vol.Optional(CONF_HUB_ID): cv.string,
     }
 )
 
@@ -50,7 +51,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     for hub_config in config[DOMAIN]:
         i2c_bus = hub_config[CONF_I2C_BUS]
         i2c_address = hub_config[CONF_ADDRESS]
-        hub_id = hub_config.get(CONF_ID, f"ads1115_{i2c_address:02x}")
+        hub_id = hub_config.get(CONF_HUB_ID, f"ads1115_{i2c_address:02x}")
 
         _LOGGER.debug(
             "Setting up ADS1115 hub: id=%s, bus=%d, address=0x%02x",

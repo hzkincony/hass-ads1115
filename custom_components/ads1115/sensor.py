@@ -12,7 +12,7 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import CONF_ADDRESS, CONF_ID, CONF_NAME, UnitOfElectricPotential
+from homeassistant.const import CONF_ADDRESS, CONF_NAME, UnitOfElectricPotential
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -22,6 +22,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_GAIN,
+    CONF_HUB_ID,
     CONF_I2C_BUS,
     CONF_MULTIPLEXER,
     CONF_MULTIPLIER,
@@ -49,11 +50,27 @@ def validate_gain(value):
         raise vol.Invalid(f"Invalid gain value: {value}. Must be one of {list(GAIN_OPTIONS.keys())}")
     return gain_str
 
+
+def _validate_hub_or_direct_config(config: dict) -> dict:
+    """Validate that either hub_id OR (i2c_bus + i2c_address) is provided."""
+    has_hub_id = CONF_HUB_ID in config
+    has_i2c_bus = CONF_I2C_BUS in config
+    has_address = CONF_ADDRESS in config
+    
+    # If hub_id is provided, i2c_bus and address are optional (will be fetched from hub)
+    if has_hub_id:
+        return config
+    
+    # If hub_id is NOT provided, i2c_bus and address must be provided (with defaults)
+    # The schema already has defaults, so this is automatically satisfied
+    return config
+
+
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
+        vol.Optional(CONF_HUB_ID): cv.string,
         vol.Optional(CONF_I2C_BUS, default=DEFAULT_I2C_BUS): cv.positive_int,
         vol.Optional(CONF_ADDRESS, default=DEFAULT_I2C_ADDRESS): cv.positive_int,
-        vol.Optional(CONF_ID): cv.string,
         vol.Required(CONF_MULTIPLEXER): vol.In(list(MULTIPLEXER_MAP.keys())),
         vol.Required(CONF_NAME): cv.string,
         vol.Optional(CONF_GAIN, default=DEFAULT_GAIN): validate_gain,
@@ -71,10 +88,57 @@ async def async_setup_platform(
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Set up ADS1115 sensor platform."""
-    i2c_bus = config[CONF_I2C_BUS]
-    i2c_address = config[CONF_ADDRESS]
-    hub_id = config.get(CONF_ID)
+    hub_id = config.get(CONF_HUB_ID)
+    i2c_bus = config.get(CONF_I2C_BUS)
+    i2c_address = config.get(CONF_ADDRESS)
     multiplexer = config[CONF_MULTIPLEXER]
+
+    # Initialize hass.data[DOMAIN] if needed
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+
+    # Determine which coordinator to use
+    coordinator = None
+    
+    if hub_id:
+        # User provided hub_id - look up the hub
+        if hub_id not in hass.data[DOMAIN]:
+            raise vol.Invalid(
+                f"Hub '{hub_id}' not found. Make sure the hub is defined in the ads1115 component configuration."
+            )
+        coordinator = hass.data[DOMAIN][hub_id]
+        
+        # Get i2c_bus and i2c_address from the coordinator (for logging and entity creation)
+        i2c_bus = coordinator.i2c_bus
+        i2c_address = coordinator.i2c_address
+        
+        _LOGGER.debug(
+            "Using hub '%s' (bus=%d, address=0x%02x) for sensor",
+            hub_id,
+            i2c_bus,
+            i2c_address,
+        )
+    else:
+        # No hub_id - use direct i2c_bus and i2c_address
+        # Try to find existing coordinator by address key
+        coordinator_key = f"{i2c_bus}_{i2c_address}"
+        
+        if coordinator_key in hass.data[DOMAIN]:
+            coordinator = hass.data[DOMAIN][coordinator_key]
+            _LOGGER.debug(
+                "Using existing implicit hub at bus=%d, address=0x%02x",
+                i2c_bus,
+                i2c_address,
+            )
+        else:
+            # Create new implicit coordinator
+            _LOGGER.info(
+                "Creating implicit ADS1115 hub at 0x%02x on bus %d (no hub configuration found)",
+                i2c_address,
+                i2c_bus,
+            )
+            coordinator = ADS1115Coordinator(hass, i2c_bus, i2c_address, {})
+            hass.data[DOMAIN][coordinator_key] = coordinator
 
     # Parse multiplexer to determine measurement type
     mux_config = MULTIPLEXER_MAP[multiplexer]
@@ -104,28 +168,6 @@ async def async_setup_platform(
         i2c_address,
         multiplexer,
     )
-
-    # Get or create coordinator for this hub
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-
-    # Try to find coordinator by hub_id first, then by address key
-    coordinator_key = f"{i2c_bus}_{i2c_address}"
-    coordinator = None
-
-    if hub_id and hub_id in hass.data[DOMAIN]:
-        coordinator = hass.data[DOMAIN][hub_id]
-    elif coordinator_key in hass.data[DOMAIN]:
-        coordinator = hass.data[DOMAIN][coordinator_key]
-    else:
-        # Create new coordinator if hub wasn't explicitly defined
-        _LOGGER.info(
-            "Creating implicit ADS1115 hub at 0x%02x on bus %d (no hub configuration found)",
-            i2c_address,
-            i2c_bus,
-        )
-        coordinator = ADS1115Coordinator(hass, i2c_bus, i2c_address, {})
-        hass.data[DOMAIN][coordinator_key] = coordinator
 
     # Add this channel to the coordinator
     coordinator.channels_config[channel_id] = channel_config

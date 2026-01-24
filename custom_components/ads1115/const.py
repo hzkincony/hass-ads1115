@@ -3,6 +3,7 @@
 DOMAIN = "ads1115"
 
 # Configuration keys
+CONF_HUB_ID = "hub_id"
 CONF_I2C_BUS = "i2c_bus"
 CONF_CHANNELS = "channels"
 CONF_GAIN = "gain"

@@ -14,7 +14,7 @@ ads1115:
   # Multiple hubs on same I2C bus (optional)
   # - address: 0x49        # Second device with ADDR pin to VDD
   #   i2c_bus: 1
-  #   id: ads1115_second   # Optional: custom ID for reference
+  #   hub_id: ads1115_second   # Optional: custom hub_id for reference
 
 
 # ============================================================================
@@ -86,22 +86,22 @@ sensor:
 # ads1115:
 #   - address: 0x48
 #     i2c_bus: 1
-#     id: ads1115_primary    # Custom ID
+#     hub_id: ads1115_primary    # Custom hub_id
 #
 #   - address: 0x49
 #     i2c_bus: 1
-#     id: ads1115_secondary  # Custom ID
+#     hub_id: ads1115_secondary  # Custom hub_id
 #
 # sensor:
 #   # Sensors on first device (0x48)
 #   - platform: ads1115
-#     id: ads1115_primary      # Reference the hub
+#     hub_id: ads1115_primary      # Reference the hub
 #     multiplexer: A0_GND
 #     name: "Primary Sensor 1"
 #
 #   # Sensors on second device (0x49)
 #   - platform: ads1115
-#     id: ads1115_secondary    # Reference the hub
+#     hub_id: ads1115_secondary    # Reference the hub
 #     multiplexer: A0_GND
 #     name: "Secondary Sensor 1"
 
@@ -122,7 +122,7 @@ sensor:
 # i2c_bus (optional, default: 1)
 #   I2C bus number (typically 1 on Raspberry Pi)
 #
-# id (optional)
+# hub_id (optional)
 #   Custom identifier for referencing this hub from sensors
 
 
@@ -162,7 +162,7 @@ sensor:
 # i2c_bus (optional, default: 1)
 #   I2C bus number if not using hub definition
 #
-# id (optional)
+# hub_id (optional)
 #   Reference to a specific hub (when using multiple hubs)
 
 
