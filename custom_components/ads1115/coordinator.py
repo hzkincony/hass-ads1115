@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 import logging
+import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -114,6 +115,9 @@ class ADS1115Coordinator(DataUpdateCoordinator):
                         raw_value = self._read_differential(diff_pair)
                     else:
                         channel_num = config.get("channel")
+                        # Discard first read after mux switch to avoid stale conversion
+                        _ = self.adc.readADC(channel_num)
+                        time.sleep(0.01)
                         raw_value = self.adc.readADC(channel_num)
 
                     # Convert to voltage using current voltage factor
