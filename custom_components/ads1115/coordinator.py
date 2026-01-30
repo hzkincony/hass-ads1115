@@ -106,6 +106,8 @@ class ADS1115Coordinator(DataUpdateCoordinator):
                     # Get voltage conversion factor for current gain setting
                     voltage_factor = self.adc.toVoltage()
 
+                    channel_num = None
+
                     # Read based on measurement type
                     if measurement_type == MEASUREMENT_DIFFERENTIAL:
                         diff_pair = config.get("differential_pair", "0-1")
@@ -131,8 +133,9 @@ class ADS1115Coordinator(DataUpdateCoordinator):
                     }
 
                     _LOGGER.debug(
-                        "Read complete: channel_id=%s, ADC_channel=%s, name=%s, raw=%d, voltage=%.4fV, factor=%.6f",
+                        "Read complete: channel_id=%s, multiplexer=%s, ADC_channel=%s, name=%s, raw=%d, voltage=%.4fV, factor=%.6f",
                         channel_id,
+                        config.get("multiplexer"),
                         channel_num,
                         config.get("name", "unknown"),
                         raw_value,
