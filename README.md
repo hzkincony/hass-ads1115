@@ -6,6 +6,8 @@ Home Assistant custom integration for the Texas Instruments ADS1115 ADC.
 
 ### Option 1: HACS (Custom Repository)
 - Add this repository to HACS as a custom integration.
+  - Repository: https://github.com/hzkincony/hass-ads1115
+  - Category: Integration
 - Install **ADS1115 ADC Sensor** from HACS.
 - Restart Home Assistant.
 
