@@ -72,6 +72,27 @@ sensor:
 - **state_class** (optional): State class for statistics, e.g., `measurement`.
 - **address / i2c_bus / hub_id** (optional): Override hub settings for this sensor.
 
+## Automation Example (SSD1306 Display)
+
+Example automation to show A1–A4 values on SSD1306 every 5 seconds:
+
+```yaml
+automation:
+  - id: ads1115_ssd1306_display
+    alias: "ADS1115 to SSD1306 (A1-A4)"
+    trigger:
+      - platform: time_pattern
+        seconds: "/5"
+    action:
+      - service: ssd1306_i2c.print_text
+        data:
+          x: 0
+          y: 0
+          clear: true
+          font_size: 12
+          text: "A1: {{ states('sensor.a1') | float(0) | round(3) }} V\nA2: {{ states('sensor.a2') | float(0) | round(3) }} V\nA3: {{ states('sensor.a3') | float(0) | round(3) }} mA\nA4: {{ states('sensor.a4') | float(0) | round(3) }} mA"
+```
+
 ## Screenshot
 
 ![Sensor card](docs/screenshot.png)
